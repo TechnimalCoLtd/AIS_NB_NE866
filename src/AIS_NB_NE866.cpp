@@ -11,19 +11,16 @@ ARDUINO MEGA: RX = 18, TX = 19
 #include "AIS_NB_NE866.h"
 
 //################### Buffer #######################
-String input;
+String input = F("");
 String buffer;
 //################### counter value ################
 byte k=0;
 //################## flag ##########################
 bool end=false;
-bool send_NSOMI=false;
 bool flag_rcv=true;
 //################### Parameter ####################
 bool en_rcv=false;
 unsigned long previous=0;
-unsigned char sendMode = 0;
-String sendStr;
 
 void event_null(char *data){}
 
@@ -31,12 +28,11 @@ AIS_NB_NE866::AIS_NB_NE866(){
 	Event_debug =  event_null;
 }
 
-void AIS_NB_NE866:: setupDevice(String serverPort, String addressI){
+void AIS_NB_NE866:: setupDevice(Stream* serial, String serverP, String serverI){
 	
 	Serial.println(F("############ AIS_NB_NE866 Library ############"));
 
-	Serial1.begin(9600);
-    _Serial = &Serial1;   
+    _Serial = serial;   
 	
 	reset();
 	setEchoOff();
@@ -58,7 +54,10 @@ void AIS_NB_NE866:: setupDevice(String serverPort, String addressI){
 	if (debug) Serial.print(F("# IMSI SIM-->  "));
 	if (debug) Serial.println(imsi);
 	
-	attachNB(serverPort,addressI);
+	serverIP = serverI;
+	serverPort = serverP;
+
+	attachNB();
 }
 
 void AIS_NB_NE866:: setEchoOff(){
@@ -280,7 +279,7 @@ String AIS_NB_NE866:: getAPN(){
 	return(out);
 }
 
-bool AIS_NB_NE866:: attachNB(String serverPort, String addressI) {
+bool AIS_NB_NE866:: attachNB() {
 	bool ret=false;
 	signal sig;
 
@@ -301,7 +300,7 @@ bool AIS_NB_NE866:: attachNB(String serverPort, String addressI) {
 				ret=true;
 				break;
 			}
-		Serial.print(F("."));
+			Serial.print(F("."));
 		}
 	} else{
 			return true;
@@ -385,139 +384,134 @@ signal AIS_NB_NE866:: getSignal(int state){
 	return(sig);
 }
 
-void AIS_NB_NE866:: createUDPSocket(String port, String addressI) {
-	if(sendMode == MODE_STRING_HEX){                            
-		_Serial->println(F("AT#SCFGEXT=1,3,1,0,0,1"));
-	}
-	else{
+void AIS_NB_NE866:: createUDPSocket() {
+	if(send_mode == MODE_STRING_HEX){                            
+		_Serial->println(F("AT#SCFGEXT=1,3,0,0,0,1"));
+	} else {
 		_Serial->println(F("AT#SCFGEXT=1,3,0,0,0,0"));
 	}
 
 	AIS_NB_NE866_RES res = wait_rx_bc(3000,F("OK"));
 	_Serial->print(F("AT#SD=1,1,"));
-	_Serial->print(port);
+	_Serial->print(serverPort);
 	_Serial->print(F(",\""));
-	_Serial->print(addressI);
+	_Serial->print(serverIP);
 	_Serial->println(F("\",0,5100,1"));
 
 	res = wait_rx_bc(3000,F("OK"));
 	delay(300);
-	if (debug && res.status) Serial.println(F("# Create socket success"));
+	if (res.status) {
+		if (debug) Serial.println(F("# Create socket successful"));
+		socketCreated = true;
+	} else {
+		if (debug && !socketCreated) Serial.println(F("# Create socket failed"));
+	}
 }
 
-UDPSend AIS_NB_NE866:: sendUDPmsg( String addressI,String port,unsigned int len,char *data,unsigned char send_mode){
-	sendMode = send_mode;
-
-	createUDPSocket(port, addressI);
+UDPSend AIS_NB_NE866:: sendUDPmsg(unsigned int len,char *data){
+	createUDPSocket();
 
 	UDPSend ret;
-	if (debug) Serial.println(F("\n========="));
-	if (debug) Serial.print(F("# Sending Data IP="));
-	if (debug) Serial.println(addressI);
-	if (debug) Serial.print(F("# PORT="));
-	if (debug) Serial.print(port);
-	if (debug) Serial.println();
+	if (!socketCreated) {
+		if (debug) Serial.println("# Socket not found");
+		return ret;
+	}
+
+	if (debug) {
+		Serial.println(F("\n========="));
+		Serial.print(F("# Sending Data IP="));
+		Serial.println(serverIP);
+		Serial.print(F("# PORT="));
+		Serial.print(serverPort);
+		Serial.println();
+	}
 
 	_Serial->print(F("AT#SSENDEXT=1,"));
 
 	if(send_mode == MODE_STRING_HEX){
 		_Serial->print(String(len/2));
-		_Serial->write(13);
-	}
-	else{
+	} else {
 		_Serial->print(String(len));
-		_Serial->write(13);
 	}
+	_Serial->write(13);
 
-	AIS_NB_NE866_RES res = wait_rx_bc(200,F(">"));;
+	AIS_NB_NE866_RES res = wait_rx_bc(200,F(">"));
 
 	if (debug) Serial.print(F("# Data="));
-		if(send_mode == MODE_STRING_HEX){
-			for(int i=0;i<len;i++){
-				_Serial->print(data[i]);
-				delay(10);
 
-				if (debug) Serial.print(data[i]);
-			}
-		}
-		if(send_mode == MODE_STRING){
-			if (debug) Serial.print(data);
-			_Serial->print(data);
-		}
-
-	Serial.println();
+	_Serial->print(data);
 	_Serial->write(13);
+	if (debug) Serial.print(data);
 	
 	res = wait_rx_bc(6000,F("OK"));	
 
-	if(res.status){
-		if (debug) Serial.println(F("# Send OK"));
-	}else {
-		if (debug) Serial.println(F("# Send ERROR"));		
+	if (debug) {
+		if(res.status){
+			Serial.print(F("\n# Send OK "));
+		}else {
+			Serial.print(F("\n# Send ERROR "));
+		}
+		Serial.print(res.data);
+		Serial.println();	
 	}
 
 	_Serial->flush();
 	return(ret);
 }
 
+void AIS_NB_NE866:: clearBuffer() {
+	input = F("");
+	k = 0;
+	end = false;
+}
+
 UDPReceive AIS_NB_NE866:: waitResponse(){
   	UDPReceive rx_ret;
+	
+	if(_Serial->available()){
+		char data = (char)_Serial->read();
+		if(data == '\n' || data == '\r'){
+			if(k>2){
+				end = true;
+				k = 0;
+			}
+			k++;
+		} else {
+			input += data;
+		}
+	}
 
-  if(_Serial->available()){
-    char data=(char)_Serial->read();
-    if(data=='\n' || data=='\r'){
-      if(k>2){
-        end=true;
-        k=0;
-      }
-      k++;
-    }
-    else{
-      input+=data;
-    }
-  }
-  if(end){
-    end=false;
+	if(end){
+		end = false;
 
-    int index1 = input.indexOf(F(","));
-    if(index1!=-1){
-    	int index0 = input.indexOf(F("SRING: "));
-        int index2 = input.indexOf(F(","),index1+1);
-        int index3 = input.indexOf(F(","),index2+1);
-        int index4 = input.indexOf(F(","),index3+1);
-        int index5 = input.indexOf(F(","),index4+1);
-        int index6 = input.indexOf(F("\r"));        
+		int index1 = input.indexOf(F(","));
+		if(index1!=-1){
+			int index0 = input.indexOf(F("SRING: "));
+			int index2 = input.indexOf(F(","),index1+1);
+			int index3 = input.indexOf(F(","),index2+1);
+			int index4 = input.indexOf(F(","),index3+1);
+			int index5 = input.indexOf(F(","),index4+1);
+			int index6 = input.indexOf(F("\r"));        
 
-        rx_ret.socket = input.substring(index3+1,index5).toInt();
-        rx_ret.ip_address = input.substring(index0+7,index1);
-        rx_ret.port = input.substring(index1+1,index2).toInt();
-        rx_ret.length = input.substring(index3+1,index4).toInt();
-        rx_ret.data = input.substring(index5+1,index6);
+			rx_ret.socket = input.substring(index3+1,index5).toInt();
+			rx_ret.ip_address = input.substring(index0+7,index1);
+			rx_ret.port = input.substring(index1+1,index2).toInt();
+			rx_ret.length = input.substring(index3+1,index4).toInt();
+			rx_ret.data = input.substring(index5+1,index6);
 
-        if (debug) receive_UDP(rx_ret);
+			if (debug) receive_UDP(rx_ret);
+		}
 
-    }
-
-    send_NSOMI=false;
-    input=F("");
-          
-  }
+		input = F("");
+	}
     return rx_ret;
 }
 
-UDPSend AIS_NB_NE866:: sendUDPmsg(String addressI,String port,String data){
+UDPSend AIS_NB_NE866:: sendUDPmsg(String data){
 	int x_len = data.length();
-
-	char buf[x_len+2];
+	char buf[x_len+1];
 	data.toCharArray(buf,x_len+1);
-	return(sendUDPmsg(addressI,port,x_len,buf,MODE_STRING_HEX));
-}
-UDPSend AIS_NB_NE866:: sendUDPmsgStr(String addressI,String port,String data){
-	sendStr = data;
-	int x_len = data.length();
-	char buf[x_len+2];
-	data.toCharArray(buf,x_len+1);
-	return(sendUDPmsg(addressI,port,x_len,buf,MODE_STRING));
+	return(sendUDPmsg(x_len,buf));
 }
 
 bool AIS_NB_NE866:: closeUDPSocket(){
@@ -611,11 +605,11 @@ char AIS_NB_NE866:: char_to_byte(char c){
 
 void AIS_NB_NE866:: receive_UDP(UDPReceive rx){
   String dataStr;
-  Serial.println(F("======"));
+  Serial.println(F("========="));
   Serial.println(F("# Incoming Data"));
   Serial.println("# IP--> " + rx.ip_address);
   Serial.println("# Port--> " + String(rx.port));
   Serial.println("# Length--> " + String(rx.length));
   Serial.println("# Data--> " + rx.data);
-  Serial.println(F("======"));
+  Serial.println(F("========="));
 }

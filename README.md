@@ -2,9 +2,11 @@
 
 The Arduino Library is designed for `DEVIO NB-XBEE I`to connect with your own IoT Platform/ Server. 
 
-This version is recommended for Mega, MKR boards, Zero, Due, 101, etc.
+This custom version for OWL v2, OWL v3, ESP32
 
-Note: ARDUINO MEGA: RX = 18, TX = 19
+## Require Libs:
+	SoftwareSerial
+		○ Test with https://github.com/TechnimalCoLtd/espsoftwareserial
 
 ## Function List:
 
@@ -12,7 +14,10 @@ Note: ARDUINO MEGA: RX = 18, TX = 19
 	debug(<Boolean>)
 		○ True : Print Log on Serial Monitor
 		○ False: No Log on Serial Monitor
-	setupDevice(<serverPort>) 
+	send_mode(<unsigned char>)
+		○ MODE_STRING : Send message in string mode
+		○ MODE_STRING_HEX : Send message in hex string mode
+	setupDevice(<*Steam>, <serverPort>, <serverIP>) 
 	getDeviceIP()
 		○ Return: <String IP>
 	str2HexStr(< String data>)
@@ -20,12 +25,12 @@ Note: ARDUINO MEGA: RX = 18, TX = 19
 	pingIP(serverIP)
 		○ Return type: pingRESP
 		○ Value: addr, ttl, rtt
+	clearBuffer()
+		○ Clear input buffer
 
 ### Send Data:
-	sendUDPmsgStr(<serverIP>,< serverPort>,<udpData>)
+	sendUDPmsg(<data>)
 		○ Maximum udpData : 512 Bytes
-	sendUDPmsg (<serverIP>,< serverPort>,<udpDataHEX>)
-		○ Maximum udpDataHEX : 512 Bytes
 
 ### Receive Data: 
 	waitResponse()
@@ -60,8 +65,6 @@ For `DEVIO NB-XBEE I` Pinout, please go to "www.ais.co.th/aiap" in the "IoT Dev 
   NB-IoT Module Certification
   - RED (Europe), CCC (China), GCF.
 
-
-
 # Getting Started
   1. Connect `DEVIO NB-XBEE I` to Arduino Board
   2. Coding & Compile using Arduino Desktop IDE
@@ -69,7 +72,3 @@ For `DEVIO NB-XBEE I` Pinout, please go to "www.ais.co.th/aiap" in the "IoT Dev 
 		- Import AIS NB-IoT Library 
 		- Open AIS NB-IoT Example and specify your server IP & Port
 		- Compile & Upload
-
-สนใจสั่งซื้อ DEVIO NB-XBEE I ได้ที่ AIS online store (https://store.ais.co.th/th/devio-nb-xbee-i.html)
-
-สอบถามข้อมูลเพิ่มเติม ติดต่อ AIS IoT Alliance Program (www.ais.co.th/aiap) ที่หน้า Business Enquiry

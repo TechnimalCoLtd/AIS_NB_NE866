@@ -5,8 +5,8 @@
 #include <Stream.h>
 #include <Wire.h>
 
-#define MODE_STRING 0
-#define MODE_STRING_HEX 1
+#define MODE_STRING 		0x00
+#define MODE_STRING_HEX 	0x01
 
 struct AIS_NB_NE866_RES{
 	unsigned char status;
@@ -46,6 +46,7 @@ public:
 	AIS_NB_NE866();
 	//bool debug = true;
 	bool debug;
+	unsigned char send_mode = MODE_STRING;
 
 	void (*Event_debug)(char *data);
 	void setEchoOff();
@@ -72,22 +73,22 @@ public:
 	bool sgact(unsigned char mode);
 	bool getNBConnect();
 	
-	void setupDevice(String serverPort, String addressI);
-	bool attachNB(String serverPort, String addressI);
+	void setupDevice(Stream* serial, String serverPort, String addressI);
+	bool attachNB();
 	bool detachNB();
 
 	String getDeviceIP();
 	signal getSignal();
 	signal getSignal(int state);
 
-	void createUDPSocket(String port, String addressI);
+	void createUDPSocket();
 
-    UDPSend sendUDPmsg(String addressI,String port,String data);
-	UDPSend sendUDPmsg(String addressI,String port,unsigned int len,char *data,unsigned char send_mode);
-	UDPSend sendUDPmsgStr(String addressI,String port,String data);
+    UDPSend sendUDPmsg(String data);
+	UDPSend sendUDPmsg(unsigned int len,char *data);
 	
 	bool closeUDPSocket();
 
+	void clearBuffer();
 	UDPReceive waitResponse();
 
 	void printHEX(char *str);
@@ -97,10 +98,13 @@ public:
 	void receive_UDP(UDPReceive rx);
 
 private:
-		AIS_NB_NE866_RES wait_rx_bc(long tout,String str_wait);
+	AIS_NB_NE866_RES wait_rx_bc(long tout,String str_wait);
+	String serverIP;
+	String serverPort;
+	bool socketCreated = false;
 
 protected:
-	 Stream *_Serial;	
+	Stream *_Serial;	
 };
 
 #endif

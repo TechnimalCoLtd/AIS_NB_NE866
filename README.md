@@ -4,8 +4,8 @@ The Arduino Library is designed for `DEVIO NB-XBEE I`to connect with your own Io
 
 This custom version for OWL v2, OWL v3, ESP32
 
-## Require Libs:
-	SoftwareSerial
+## Optional :
+	SoftwareSerial Library
 		○ Test with https://github.com/TechnimalCoLtd/espsoftwareserial
 
 ## Function List:
